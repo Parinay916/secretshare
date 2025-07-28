@@ -1,8 +1,6 @@
-import java.io.*;
 import java.math.BigInteger;
 import java.util.*;
-import org.json.JSONObject;
-import org.json.JSONException;
+import java.io.*;
 
 public class SecretSolver {
 
@@ -14,50 +12,74 @@ public class SecretSolver {
         }
     }
 
-    public static void main(String[] args) {
-        try {
-            String[] files = {"testcase1.json", "testcase2.json"};
+    public static void main(String[] args) throws IOException {
+        Scanner sc = new Scanner(System.in);
 
-            for (int i = 0; i < files.length; i++) {
-                JSONObject json = new JSONObject(readFile(files[i]));
+        System.out.println("Paste JSON input below, end with an empty line:");
+        StringBuilder jsonBuilder = new StringBuilder();
+        while (sc.hasNextLine()) {
+            String line = sc.nextLine();
+            if (line.trim().isEmpty()) break;
+            jsonBuilder.append(line);
+        }
 
-                JSONObject keys = json.getJSONObject("keys");
-                int k = keys.getInt("k");
+        String json = jsonBuilder.toString().replaceAll("[{}\"]", "").trim();
 
-                List<Point> points = new ArrayList<>();
+        String[] entries = json.split(",");
+        Map<String, String> map = new LinkedHashMap<>();
+        for (String entry : entries) {
+            String[] kv = entry.trim().split(":", 2);
+            if (kv.length == 2)
+                map.put(kv[0].trim(), kv[1].trim());
+        }
 
-                for (String key : json.keySet()) {
-                    if (key.equals("keys")) continue;
+        int n = 0, k = 0;
+        List<Point> points = new ArrayList<>();
 
-                    JSONObject root = json.getJSONObject(key);
-                    int base = Integer.parseInt(root.getString("base"));
-                    String value = root.getString("value");
+   
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
 
-                    BigInteger x = new BigInteger(key);
-                    BigInteger y = new BigInteger(value, base);
+            if (key.equals("keys.n")) {
+                n = Integer.parseInt(value);
+            } else if (key.equals("keys.k")) {
+                k = Integer.parseInt(value);
+            }
+        }
 
+  
+        for (String key : map.keySet()) {
+            if (key.equals("keys.n") || key.equals("keys.k")) continue;
+
+      
+            if (key.endsWith(".base")) {
+                String id = key.split("\\.")[0];
+                String baseKey = id + ".base";
+                String valueKey = id + ".value";
+
+                if (map.containsKey(baseKey) && map.containsKey(valueKey)) {
+                    int base = Integer.parseInt(map.get(baseKey));
+                    String encodedValue = map.get(valueKey);
+                    BigInteger x = new BigInteger(id);
+                    BigInteger y = new BigInteger(encodedValue, base);
                     points.add(new Point(x, y));
                 }
-
-                if (points.size() < k) {
-                    System.out.println("Not enough points to interpolate.");
-                    continue;
-                }
-
-               
-                points.sort(Comparator.comparing(p -> p.x));
-                List<Point> usedPoints = points.subList(0, k);
-
-                BigInteger secret = lagrangeInterpolation(usedPoints);
-                System.out.println("Secret from " + files[i] + ": " + secret);
             }
-
-        } catch (IOException | JSONException e) {
-            System.err.println("Error: " + e.getMessage());
         }
+
+        if (points.size() < k) {
+            System.out.println("Not enough points to interpolate.");
+            return;
+        }
+
+        points.sort(Comparator.comparing(p -> p.x));
+        List<Point> usedPoints = points.subList(0, k);
+
+        BigInteger secret = lagrangeInterpolation(usedPoints);
+        System.out.println("Secret is: " + secret);
     }
 
-    
     private static BigInteger lagrangeInterpolation(List<Point> points) {
         BigInteger secret = BigInteger.ZERO;
 
@@ -81,18 +103,5 @@ public class SecretSolver {
         }
 
         return secret;
-    }
-
-    private static String readFile(String filename) throws IOException {
-        BufferedReader br = new BufferedReader(new FileReader(filename));
-        StringBuilder sb = new StringBuilder();
-        String line;
-
-        while ((line = br.readLine()) != null) {
-            sb.append(line.trim());
-        }
-
-        br.close();
-        return sb.toString();
     }
 }
